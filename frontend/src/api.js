@@ -1,4 +1,4 @@
-const BASE = '/api';
+const BASE = (import.meta.env.VITE_API_URL || 'http://localhost:3001') + '/api';
 const TOKEN_KEY = 'pooja_sweets_token';
 
 function getToken() {
