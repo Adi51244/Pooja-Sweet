@@ -1,0 +1,6 @@
+node_modules/
+snacks.db
+snacks.db-wal
+snacks.db-shm
+*.log
+.env

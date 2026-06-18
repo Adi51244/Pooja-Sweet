@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-cream-50 text-cocoa-800 font-sans antialiased;
+    overscroll-behavior: none;
+  }
+
+  * {
+    @apply box-border;
+  }
+}
+
+@layer components {
+  .input {
+    @apply w-full px-4 py-3 rounded-xl bg-white border-2 border-cream-200 text-cocoa-800 placeholder:text-cocoa-600/40 focus:outline-none focus:border-honey-400 focus:ring-2 focus:ring-honey-400/20 transition-all;
+  }
+}
+
+@layer utilities {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
