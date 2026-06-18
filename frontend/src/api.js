@@ -84,6 +84,9 @@ export const api = {
 
   getWhatsAppReminder: (date) =>
     request(`/reminders/whatsapp${date ? `?date=${date}` : ''}`),
+  
+  getStaffWhatsApp: (staff_id, date) =>
+    request(`/reminders/whatsapp?staff_id=${staff_id}${date ? `&date=${date}` : ''}`),
 
   getSalary: (month) =>
     request(`/salary${month ? `?month=${month}` : ''}`),

@@ -276,43 +276,66 @@ app.get('/api/payments/dates', (req, res) => {
 
 app.get('/api/reminders/whatsapp', (req, res) => {
   const date = req.query.date || todayDate();
+  const staff_id = req.query.staff_id; // optional — for single staff
   const settings = getSettings();
   const shopName = settings.shop_name || 'Pooja Sweets';
 
-  const staff = db.prepare('SELECT * FROM staff WHERE active = 1 ORDER BY name').all();
-  const getPayment = db.prepare(
-    'SELECT * FROM payments WHERE staff_id = ? AND date = ?'
-  );
-
-  const pending = staff.filter((s) => {
-    const p = getPayment.get(s.id, date);
-    return !p || p.paid !== 1;
-  });
-
   const formattedDate = new Date(date + 'T00:00:00').toLocaleDateString('en-IN', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
+    weekday: 'long', day: 'numeric', month: 'long',
   });
 
-  let message;
-  if (pending.length === 0) {
-    message = `✅ ${shopName}\n\nAll staff snack money paid for ${formattedDate}! 🎉`;
-  } else {
-    const lines = pending.map(
-      (s) => `• ${s.name} — ₹${s.snack_amount}`
-    );
-    const total = pending.reduce((sum, s) => sum + s.snack_amount, 0);
-    message = `🍬 ${shopName} — Snack Reminder\n\n${formattedDate}\n\n${pending.length} staff still pending snack money:\n${lines.join('\n')}\n\nTotal pending: ₹${total}\n\n(Daily snacks are separate from salary)`;
+  // Single staff reminder
+  if (staff_id) {
+    const staff = db.prepare('SELECT * FROM staff WHERE id = ?').get(staff_id);
+    if (!staff) return res.status(404).json({ error: 'Staff not found' });
+
+    const payment = db.prepare('SELECT * FROM payments WHERE staff_id = ? AND date = ?').get(staff_id, date);
+    const paid = payment?.paid === 1;
+
+    const message = paid
+      ? `✅ ${shopName}\n\nHello ${staff.name}!\nYour snack money ₹${staff.snack_amount} has been given for ${formattedDate}. 🙏`
+      : `🍬 ${shopName}\n\nHello ${staff.name}!\nYour snack money ₹${staff.snack_amount} is pending for ${formattedDate}.\n\nPlease collect it from the shop.`;
+
+    const phone = staff.phone?.replace(/\D/g, '');
+    const waPhone = phone ? (phone.startsWith('91') ? phone : `91${phone}`) : '';
+    const url = waPhone
+      ? `https://wa.me/${waPhone}?text=${encodeURIComponent(message)}`
+      : `https://wa.me/?text=${encodeURIComponent(message)}`;
+
+    return res.json({ url, message, staff_name: staff.name, has_phone: !!waPhone });
   }
 
-  const phone = settings.admin_phone?.replace(/\D/g, '');
-  const waPhone = phone ? (phone.startsWith('91') ? phone : `91${phone}`) : '';
-  const url = waPhone
-    ? `https://wa.me/${waPhone}?text=${encodeURIComponent(message)}`
-    : `https://wa.me/?text=${encodeURIComponent(message)}`;
+  // All staff — return list with individual WhatsApp links
+  const staff = db.prepare('SELECT * FROM staff WHERE active = 1 ORDER BY name').all();
+  const getPayment = db.prepare('SELECT * FROM payments WHERE staff_id = ? AND date = ?');
 
-  res.json({ url, message, pending_count: pending.length });
+  const results = staff.map((s) => {
+    const payment = getPayment.get(s.id, date);
+    const paid = payment?.paid === 1;
+
+    const message = paid
+      ? `✅ ${shopName}\n\nHello ${s.name}!\nYour snack money ₹${s.snack_amount} has been given for ${formattedDate}. 🙏`
+      : `🍬 ${shopName}\n\nHello ${s.name}!\nYour snack money ₹${s.snack_amount} is pending for ${formattedDate}.\n\nPlease collect it from the shop.`;
+
+    const phone = s.phone?.replace(/\D/g, '');
+    const waPhone = phone ? (phone.startsWith('91') ? phone : `91${phone}`) : '';
+    const url = waPhone
+      ? `https://wa.me/${waPhone}?text=${encodeURIComponent(message)}`
+      : null;
+
+    return {
+      staff_id: s.id,
+      staff_name: s.name,
+      phone: s.phone,
+      has_phone: !!waPhone,
+      paid,
+      amount: s.snack_amount,
+      url,
+      message,
+    };
+  });
+
+  res.json({ date, records: results });
 });
 
 // --- Advances (deducted from salary only, NOT snacks) ---

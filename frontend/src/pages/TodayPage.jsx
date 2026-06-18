@@ -11,7 +11,7 @@ export default function TodayPage() {
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState(null);
   const [markingAll, setMarkingAll] = useState(false);
-  const [reminding, setReminding] = useState(false);
+  const [reminding, setReminding] = useState(null); // staff_id or 'all'
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
@@ -55,15 +55,41 @@ export default function TodayPage() {
     }
   };
 
-  const handleWhatsAppReminder = async () => {
-    setReminding(true);
+  // Send WhatsApp to a single staff member
+  const handleStaffWhatsApp = async (staffId) => {
+    setReminding(staffId);
     try {
-      const { url } = await api.getWhatsAppReminder(date);
-      openWhatsApp(url);
+      const result = await api.getStaffWhatsApp(staffId, date);
+      if (!result.has_phone) {
+        setError(`No phone number saved for ${result.staff_name}. Edit staff to add one.`);
+        return;
+      }
+      openWhatsApp(result.url);
     } catch (err) {
       setError(err.message);
     } finally {
-      setReminding(false);
+      setReminding(null);
+    }
+  };
+
+  // Send WhatsApp to ALL pending staff
+  const handleRemindAll = async () => {
+    setReminding('all');
+    try {
+      const result = await api.getWhatsAppReminder(date);
+      const withPhone = result.records.filter((r) => r.has_phone && !r.paid);
+      if (withPhone.length === 0) {
+        setError('No pending staff have phone numbers saved.');
+        return;
+      }
+      // Open WhatsApp for each one with a small delay
+      withPhone.forEach((r, i) => {
+        setTimeout(() => openWhatsApp(r.url), i * 1500);
+      });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setReminding(null);
     }
   };
 
@@ -102,12 +128,12 @@ export default function TodayPage() {
           {pending.length > 0 && (
             <>
               <button
-                onClick={handleWhatsAppReminder}
-                disabled={reminding}
+                onClick={handleRemindAll}
+                disabled={reminding === 'all'}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#25D366] text-white text-xs font-semibold active:scale-95 transition-transform disabled:opacity-60"
               >
                 <MessageCircle size={14} />
-                Remind
+                {reminding === 'all' ? 'Opening...' : 'Remind All'}
               </button>
               <button
                 onClick={handleMarkAll}
@@ -142,6 +168,8 @@ export default function TodayPage() {
                   record={r}
                   onToggle={handleToggle}
                   loading={toggling === r.staff.id}
+                  onWhatsApp={() => handleStaffWhatsApp(r.staff.id)}
+                  whatsAppLoading={reminding === r.staff.id}
                 />
               ))}
             </>
@@ -158,6 +186,8 @@ export default function TodayPage() {
                   record={r}
                   onToggle={handleToggle}
                   loading={toggling === r.staff.id}
+                  onWhatsApp={() => handleStaffWhatsApp(r.staff.id)}
+                  whatsAppLoading={reminding === r.staff.id}
                 />
               ))}
             </>
